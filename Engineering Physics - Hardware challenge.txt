@@ -1,0 +1,169 @@
+#include <Servo.h>
+Servo leftservo;  
+Servo rightservo;
+  
+const int pingPin = 6; 
+const int echoPin = 5;
+
+float distance;
+
+bool turn_time = false;
+
+// Bunch of constants on distance values, wheel speed and movement times
+// f for "forward", a for "adjust" (small turns when following the wall), t for "turn"
+
+const float low_dist = 30;
+const float high_dist = 70;
+
+// Best measurements we found for the robot to go "straight", still deviates from a straight line but the way follow() is defined makes this usable.
+const int fspeed_L = 125;
+const int fspeed_R = 70;
+
+const int aspeed1_L = 110;
+const int aspeed1_R = 110;
+
+const int aspeed2_L = 70;
+const int aspeed2_R = 70;
+
+const int a1_time = 500;
+const int a2_time = 250;
+const int f_time = 1500;
+
+int turns_made = 1;
+const int no_turns = 4;
+
+const int tspeed_L = 120;
+const int tspeed_R = 120;
+
+const int t_time = 750;
+const int t_ftime = 750;
+
+void setup() {
+  leftservo.attach(9);  
+  rightservo.attach(10);
+
+  Serial.begin(9600);
+ 
+  pinMode(pingPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  
+  leftservo.write(90);
+  rightservo.write(90);
+
+  delay(3000);
+}
+
+void loop() {
+// Frequently obtain measurements / information
+  get_dist();
+  check_turn();
+
+// Functions for the robot's actual movement
+  follow();
+  turn();
+}
+
+void get_dist() {
+  float duration;  
+
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pingPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+
+  Serial.print("Distance: ");
+  Serial.println(distance);
+
+  delay(50);  
+}
+
+void check_turn() {
+  if (distance < 500 && distance != 0) { // In case a "bad" reading happens
+// When the sensor picks up a large distance (i.e., "empty space"), it means it reached the gap and signals the robot to start performing the turn.
+    if (distance > 150) {
+      turn_time = true;
+    }
+    else {
+      turn_time = false;
+    }
+  }
+}
+
+void forward() {
+  leftservo.write(fspeed_L);
+  rightservo.write(fspeed_R);
+}
+
+void pause(int duration) {
+  leftservo.write(90);
+  rightservo.write(90);
+  delay(duration);
+}
+
+// Makes the robot adjust a bit to the right
+void adjust1(int duration1, int duration2) {
+  leftservo.write(aspeed1_L);
+  rightservo.write(aspeed1_R);
+  delay(duration1);
+
+  forward();
+  delay(duration2);
+}
+
+// Makes the robot adjust a bit to the left
+void adjust2(int duration1, int duration2) {
+  leftservo.write(aspeed2_L);
+  rightservo.write(aspeed2_R);
+  delay(duration1);
+
+  forward();
+  delay(duration2);
+}
+
+void follow() {
+  if (turn_time == false) {
+// When too far from the wall, adjust the robot to the left. When too close to the wall, adjust the robot to the right
+    if (distance <= low_dist && distance != 0) {
+      pause(1000);
+      
+      adjust1(a1_time, f_time);
+  
+      pause(1000);
+    }
+  
+    if (distance >= high_dist && distance < 500) {
+      pause(1000);
+  
+      adjust2(a2_time, f_time);
+  
+      pause(1000);
+    }
+    // Otherwise, make the robot move straight forward.
+    forward();
+  }
+}
+
+void turn() {
+  if (turn_time == true) { // Perform the turn only when the robot reaches the gap.
+    pause(1000); // Make the robot stop first to prevent the robot from moving too much due to a command in follow()
+
+// Turn is a bit hard coded: break big turn into a bunch of small turns, iterate these small turns over a number of turns that can be adjusted (constant at the beginning).
+    for (turns_made; turns_made <= no_turns; turns_made++) {
+      Serial.print("Turns made: ");
+      Serial.println(turns_made);
+
+      leftservo.write(tspeed_L);
+      rightservo.write(tspeed_R);
+      delay(t_time);
+
+      leftservo.write(fspeed_L);
+      rightservo.write(fspeed_R);
+      delay(t_ftime);
+    }
+  }
+}
