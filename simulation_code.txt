@@ -1,0 +1,269 @@
+#include <Servo.h>
+Servo leftservo;  
+Servo rightservo;  
+const int pingPin = 5;
+const int echoPin = 6;
+void setup() {
+  leftservo.attach(9);  
+  rightservo.attach(10);
+  Serial.begin(9600);
+  pinMode(pingPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  leftservo.write(90);
+  rightservo.write(90);
+}
+
+long distance;
+
+const int margin = 10;
+const int margin_pos = 30;
+const int gap_top = 95;
+const int gap_right = 75;
+
+const int f_speed = 180;
+const int turn_speed = 150;
+const int turn_time = 1000;
+const int adjust_speed = 180;
+const int adjust_time = 500;
+const int turn_speed_hypo = 150;
+
+bool turn = false;
+bool adjusted = false;
+bool hypo_obtained = false;
+bool hypo_done = false;
+bool gap_done = false;
+bool pos_done = false;
+bool turn_done = false;
+
+long height;
+long hypothenuse;
+long gap_wall;
+
+unsigned long time_0;
+unsigned long time_1;
+unsigned long time_2;
+
+void loop() {
+  get_distance();
+  // get_turn(); 
+  if (turn == false) {
+    before_turn();
+  }
+  else {
+    get_hypothenuse();
+    get_gap();
+    move_to_pos();
+    the_turn();
+    straight_2();
+  }
+}
+
+void get_distance() {
+  long duration;
+
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pingPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+  // Serial.print("distance: ");
+  // Serial.println(distance);
+}
+
+void get_turn() {
+  Serial.print("turn: ");
+  Serial.println(turn);
+}
+
+void before_turn() {
+  if (turn == false) {
+    straight(gap_top);
+  }
+
+  if (distance >= 300) {
+    stop();
+    turn = true; 
+  }
+}
+
+void forward(int speed) {
+  leftservo.write(speed);
+  rightservo.write(180 - speed);
+}
+
+void stop() {
+  leftservo.write(90);
+  rightservo.write(90);
+}
+
+void turn_r(int speed1, int speed2, int time1, int time2) {
+  leftservo.write(speed1);
+  rightservo.write(90);
+  delay(time1);
+
+  forward(speed2);
+  delay(time2);
+  
+  leftservo.write(90);
+  rightservo.write(180 - speed1);
+  delay(time1);
+}
+
+void turn_l(int speed1, int speed2, int time1, int time2) {
+  leftservo.write(90);
+  rightservo.write(180 - speed1);
+  delay(time1);
+
+  forward(speed2);
+  delay(time2);
+
+  leftservo.write(speed1);
+  rightservo.write(90);
+  delay(time1);
+}
+
+void straight(int gap) {
+  if (adjusted == false) {
+    if (distance <= gap - margin && distance != 0) {
+      turn_r(turn_speed, adjust_speed, turn_time, adjust_time);
+    }
+    else if (distance >= gap + margin && distance != 0) {
+      turn_l(turn_speed, adjust_speed, turn_time, adjust_time);
+    }
+    else if (distance == 0) {
+    
+    }
+    else {
+      adjusted = 1;
+      height = distance;
+      Serial.print("height: ");
+      Serial.println(height);
+    }
+  }
+  else {
+    forward(f_speed);
+    time_0 = millis();
+  }
+}
+
+void get_hypothenuse() {
+  if (hypo_done == false) {
+    if (hypo_obtained == false) {
+        if (distance >= 300) {
+          leftservo.write(turn_speed_hypo);
+          rightservo.write(90);
+        }
+        else if (distance == 0) {
+
+        }
+        else {
+          hypothenuse = distance;
+          time_1 = millis();
+          Serial.print("hypothenuse: ");
+          Serial.println(hypothenuse);
+          stop();
+          hypo_obtained = true;
+        }
+      }
+      else {
+        unsigned long delta = time_1 - time_0;
+        // Serial.print("delta: ");
+        // Serial.println(delta);
+
+        time_2 = millis();
+        if (time_2 - time_1 <= delta) {
+          leftservo.write(180 - turn_speed_hypo);
+          rightservo.write(90);
+        }
+        else {
+          stop();
+          time_0 = millis();
+          hypo_done = true;
+        }
+      }
+  }
+  else {
+
+  }
+}
+
+void get_gap() {
+  if (hypo_done == true && gap_done == false) {
+    gap_wall = sqrt(hypothenuse * hypothenuse - height * height);
+    Serial.print("wall gap: ");
+    Serial.println(gap_wall);
+    gap_done = true;
+    /*
+    time_1 = millis();
+    unsigned long delta = gap_wall * 1000 / 80;
+    Serial.println(delta);
+    if (time_1 - time_0 <= delta) {
+      forward(f_speed);
+    }
+    else {
+      stop();
+    }
+    */
+  }
+}
+
+void move_to_pos() {
+  if (gap_done == true && pos_done == false) {
+    time_1 = millis();
+    unsigned long delta;
+    if (gap_wall >= gap_right + margin_pos) {
+      delta = (gap_wall - gap_right - margin_pos) * 1000 / 40;
+    }
+    else {
+      delta = 0;
+    }
+    // Serial.print("delta: ");
+    // Serial.println(delta);
+    if (time_1 - time_0 <= delta) {
+      forward(f_speed);
+    }
+    else {
+      stop();
+      pos_done = true;
+      time_0 = millis();
+      // Serial.print("time 0: ");
+      // Serial.println(time_0);
+    }
+  }
+}
+
+void the_turn() {
+  if (pos_done == true && turn_done == false) {
+    time_1 = millis();
+    unsigned long turn_90_time;
+    if (gap_wall >= 160) {
+      turn_90_time = 3750 + gap_wall;
+    }
+    else if (gap_wall < 160 && gap_wall > 100) {
+      turn_90_time = 3850 + 1.5 * gap_wall;
+    }
+    else if (gap_wall <= 100) {
+      turn_90_time = 4000;
+    }
+
+    if (time_1 - time_0 <= turn_90_time) {
+      leftservo.write(turn_speed);
+      rightservo.write(90);
+    }
+    else {
+      stop();
+      adjusted = false; 
+      turn_done = true;
+    }
+  }
+}
+
+void straight_2() {
+  if (turn_done == true) {
+    straight(gap_right);
+  }
+}
