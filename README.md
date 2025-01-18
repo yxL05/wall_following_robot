@@ -1,1 +1,3 @@
-The "software_code" is meant to work for the Super Challenge on this website: https://englab.dawsoncollege.qc.ca/robot/5-%20Super%20Challenge.html
+Two codes:
+1. "Hardware" version: implemented into a 4-wheel Arduino robot equipped with Servo motors for rotation and one infrared sensor pointed towards the left side of the vehicle. Uses that sensor to perform a turn similar to what happens when it's trying to map out a room.
+2. "Software" version: more testable version that is free from all the mess from irl factors (inconsistent wheel turning speed, constantly having to worry about power etc.). Try the code on https://englab.dawsoncollege.qc.ca/robot/5-%20Super%20Challenge.html. Works  for all 4 challenges. It's pretty the much the "baseline" algorithm for what happens where there's a "gap" / "void" when trying to map a room by following the walls (e.g., the door is open and you don't want the robot to start driving outside :D)
